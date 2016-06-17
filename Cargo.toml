@@ -1,0 +1,6 @@
+[package]
+name = "WindowManager"
+version = "0.1.0"
+authors = ["d0tr4ck3t33r <stein322@gmail.com>"]
+
+[dependencies]
