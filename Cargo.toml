@@ -1,7 +1,9 @@
 [package]
+authors = ["d0tr4ck3t33r <stein322@gmail.com>"]
 name = "WindowManager"
 version = "0.1.0"
-authors = ["d0tr4ck3t33r <stein322@gmail.com>"]
 
 [dependencies]
-wayland-client = "0.6.2"
+libc = "0.2.13"
+log = "0.3.6"
+x11-dl = "2.6.1"
