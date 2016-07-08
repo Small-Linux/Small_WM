@@ -1,0 +1,5 @@
+- Write a basic x11 WM
+Resources:
+  https://tronche.com/gui/x/xlib/function-index.html
+  https://seasonofcode.com/posts/how-x-window-managers-work-and-how-to-write-one-part-ii.html
+
