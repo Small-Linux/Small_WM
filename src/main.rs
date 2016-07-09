@@ -10,6 +10,12 @@ use std::ptr;
 
 use std::ops::Drop;
 
+// I know it is bad style, but we need a flag to check if another WM is present
+static mut wm_detected_flag: bool = false;
+
+static c_false: i32 = 0;
+static c_true: i32 = 1;
+
 mod logging {
     extern crate log;
     use log::{LogRecord, LogLevel, LogMetadata, SetLoggerError, LogLevelFilter};
@@ -36,6 +42,25 @@ mod logging {
     }
 }
 
+unsafe extern "C" fn wm_detected_handler(display: *mut xlib::Display,
+                                         err: *mut xlib::XErrorEvent)
+                                         -> i32 {
+    let aerr = *err;
+    // BadAccess aka Error code 10 means another WM is present
+    if aerr.error_code == xlib::BadAccess {
+        wm_detected_flag = true
+    }
+    0
+}
+unsafe extern "C" fn wm_error_handler(display: *mut xlib::Display,
+                                      err: *mut xlib::XErrorEvent)
+                                      -> i32 {
+    let aerr = *err;
+    // Print the Error code
+    error!("Error Catched {:?}", aerr.error_code);
+    0
+}
+
 
 struct WindowManager {
     display: *const xlib::Display,
@@ -59,10 +84,44 @@ impl WindowManager {
             info!("Makeing the display the root window");
             let root: *const xlib::Window = &((xlib.XDefaultRootWindow)(display));
 
+
             WindowManager {
                 display: display,
                 root_window: root,
                 xlib: xlib,
+            }
+        }
+
+    }
+    fn run(&mut self) -> () {
+        let xlib = {
+            let lib = self.xlib;
+            unsafe { &*lib }
+        };
+
+
+        unsafe {
+            // Set a Error Handler just for finding another WM
+            {
+                (xlib.XSetErrorHandler)(Some(wm_detected_handler));
+                let _ = (xlib.XSelectInput)(self.display as *mut _,
+                                            *self.root_window,
+                                            xlib::SubstructureRedirectMask |
+                                            xlib::SubstructureNotifyMask);
+                (xlib.XSync)(self.display as *mut _, c_false);
+
+                if wm_detected_flag {
+                    error!("Another WM is running.!");
+                    return;
+                }
+            }
+            // Set the real Error handler
+            (xlib.XSetErrorHandler)(Some(wm_error_handler));
+
+            loop {
+
+                let e: *mut xlib::XEvent = ptr::null_mut();
+                (xlib.XNextEvent)(self.display as *mut _, e);
             }
         }
 
@@ -86,6 +145,6 @@ fn main() {
     info!("Starting WM");
     let xlib: xlib::Xlib;
     xlib = xlib::Xlib::open().expect("Can't open Xlib");
-    let wm = WindowManager::new(&xlib);
-
+    let mut wm = WindowManager::new(&xlib);
+    wm.run();
 }
