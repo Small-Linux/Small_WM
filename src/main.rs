@@ -32,53 +32,21 @@ static c_false: i32 = 0;
 #[allow(dead_code)]
 static c_true: i32 = 1;
 
-mod logging {
-    extern crate log;
-    use log::{LogRecord, LogLevel, LogMetadata, SetLoggerError, LogLevelFilter};
+pub mod logging;
 
-    struct SimpleLogger;
-
-    impl log::Log for SimpleLogger {
-        fn enabled(&self, metadata: &LogMetadata) -> bool {
-            metadata.level() <= LogLevel::Info
-        }
-
-        fn log(&self, record: &LogRecord) {
-            if self.enabled(record.metadata()) {
-                println!("{} - {}", record.level(), record.args());
-            }
-        }
-    }
-
-    pub fn init() -> Result<(), SetLoggerError> {
-        log::set_logger(|max_log_level| {
-            max_log_level.set(LogLevelFilter::Info);
-            Box::new(SimpleLogger)
-        })
-    }
-}
-
-mod event_handler {
-    use x11_dl::xlib::{XCreateWindowEvent, XDestroyWindowEvent};
-
-    pub fn on_create_notify(_: XCreateWindowEvent) {}
-    pub fn on_destroy_notify(_: XDestroyWindowEvent) {}
-
-}
+pub mod event_handler;
 
 
 unsafe extern "C" fn wm_detected_handler(_: *mut Display, err: *mut XErrorEvent) -> i32 {
-    let aerr = *err;
     // BadAccess aka Error code 10 means another WM is present
-    if aerr.error_code == BadAccess {
+    if (*err).error_code == BadAccess {
         wm_detected_flag = true
     }
     0
 }
 unsafe extern "C" fn wm_error_handler(_: *mut Display, err: *mut XErrorEvent) -> i32 {
-    let aerr = *err;
     // Print the Error code
-    error!("Error Catched {:?}", aerr.error_code);
+    error!("Error Catched {:?}", (*err).error_code);
     0
 }
 
