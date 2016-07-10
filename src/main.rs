@@ -1,4 +1,5 @@
 
+
 extern crate x11_dl;
 extern crate libc;
 
@@ -15,14 +16,20 @@ use std::ops::Drop;
 use x11_dl::xlib::*;
 
 lazy_static! {
+    #[allow(non_upper_case_globals)]
+
     static ref xlib: Xlib = Xlib::open().expect("Can't open Xlib");
 }
 
 
 // I know it is bad style, but we need a flag to check if another WM is present
+#[allow(non_upper_case_globals)]
 static mut wm_detected_flag: bool = false;
 
+#[allow(non_upper_case_globals)]
 static c_false: i32 = 0;
+#[allow(non_upper_case_globals)]
+#[allow(dead_code)]
 static c_true: i32 = 1;
 
 mod logging {
@@ -52,10 +59,15 @@ mod logging {
 }
 
 mod event_handler {
-    fn OnCreateNotify(e: &XCreateWindowEvent) {}
+    use x11_dl::xlib::{XCreateWindowEvent, XDestroyWindowEvent};
+
+    pub fn on_create_notify(_: XCreateWindowEvent) {}
+    pub fn on_destroy_notify(_: XDestroyWindowEvent) {}
+
 }
 
-unsafe extern "C" fn wm_detected_handler(display: *mut Display, err: *mut XErrorEvent) -> i32 {
+
+unsafe extern "C" fn wm_detected_handler(_: *mut Display, err: *mut XErrorEvent) -> i32 {
     let aerr = *err;
     // BadAccess aka Error code 10 means another WM is present
     if aerr.error_code == BadAccess {
@@ -63,7 +75,7 @@ unsafe extern "C" fn wm_detected_handler(display: *mut Display, err: *mut XError
     }
     0
 }
-unsafe extern "C" fn wm_error_handler(display: *mut Display, err: *mut XErrorEvent) -> i32 {
+unsafe extern "C" fn wm_error_handler(_: *mut Display, err: *mut XErrorEvent) -> i32 {
     let aerr = *err;
     // Print the Error code
     error!("Error Catched {:?}", aerr.error_code);
@@ -120,14 +132,19 @@ impl WindowManager {
             (xlib.XSetErrorHandler)(Some(wm_error_handler));
 
             loop {
-                use event_handler::*;
-
                 let e: *mut XEvent = ptr::null_mut();
                 (xlib.XNextEvent)(self.display as *mut _, e);
                 info!("Received Event: {:?}", e);
+
                 match (*e).get_type() {
                     CreateNotify => {
-                        OnCreateNotify((*e).xcreatewindow);
+                        let event: XCreateWindowEvent = From::from(*e);
+                        event_handler::on_create_notify(event);
+                    }
+
+                    DestroyNotify => {
+                        let event: XDestroyWindowEvent = From::from(*e);
+                        event_handler::on_destroy_notify(event);
                     }
                     _ => (),
                 }
