@@ -5,10 +5,19 @@ extern crate libc;
 #[macro_use]
 extern crate log;
 
-use x11_dl::xlib;
+#[macro_use]
+extern crate lazy_static;
+
 use std::ptr;
 
 use std::ops::Drop;
+
+use x11_dl::xlib::*;
+
+lazy_static! {
+    static ref xlib: Xlib = Xlib::open().expect("Can't open Xlib");
+}
+
 
 // I know it is bad style, but we need a flag to check if another WM is present
 static mut wm_detected_flag: bool = false;
@@ -42,19 +51,19 @@ mod logging {
     }
 }
 
-unsafe extern "C" fn wm_detected_handler(display: *mut xlib::Display,
-                                         err: *mut xlib::XErrorEvent)
-                                         -> i32 {
+mod event_handler {
+    fn OnCreateNotify(e: &XCreateWindowEvent) {}
+}
+
+unsafe extern "C" fn wm_detected_handler(display: *mut Display, err: *mut XErrorEvent) -> i32 {
     let aerr = *err;
     // BadAccess aka Error code 10 means another WM is present
-    if aerr.error_code == xlib::BadAccess {
+    if aerr.error_code == BadAccess {
         wm_detected_flag = true
     }
     0
 }
-unsafe extern "C" fn wm_error_handler(display: *mut xlib::Display,
-                                      err: *mut xlib::XErrorEvent)
-                                      -> i32 {
+unsafe extern "C" fn wm_error_handler(display: *mut Display, err: *mut XErrorEvent) -> i32 {
     let aerr = *err;
     // Print the Error code
     error!("Error Catched {:?}", aerr.error_code);
@@ -63,13 +72,12 @@ unsafe extern "C" fn wm_error_handler(display: *mut xlib::Display,
 
 
 struct WindowManager {
-    display: *const xlib::Display,
-    root_window: *const xlib::Window,
-    xlib: *const xlib::Xlib,
+    display: *const Display,
+    root_window: *const Window,
 }
 
 impl WindowManager {
-    fn new(xlib: &xlib::Xlib) -> Self {
+    fn new() -> Self {
         unsafe {
 
             let display = (xlib.XOpenDisplay)(ptr::null());
@@ -82,23 +90,17 @@ impl WindowManager {
                   (xlib.XDisplayName)(ptr::null()) as *const char);
 
             info!("Makeing the display the root window");
-            let root: *const xlib::Window = &((xlib.XDefaultRootWindow)(display));
+            let root: *const Window = &((xlib.XDefaultRootWindow)(display));
 
 
             WindowManager {
                 display: display,
                 root_window: root,
-                xlib: xlib,
             }
         }
 
     }
     fn run(&mut self) -> () {
-        let xlib = {
-            let lib = self.xlib;
-            unsafe { &*lib }
-        };
-
 
         unsafe {
             // Set a Error Handler just for finding another WM
@@ -106,8 +108,7 @@ impl WindowManager {
                 (xlib.XSetErrorHandler)(Some(wm_detected_handler));
                 let _ = (xlib.XSelectInput)(self.display as *mut _,
                                             *self.root_window,
-                                            xlib::SubstructureRedirectMask |
-                                            xlib::SubstructureNotifyMask);
+                                            SubstructureRedirectMask | SubstructureNotifyMask);
                 (xlib.XSync)(self.display as *mut _, c_false);
 
                 if wm_detected_flag {
@@ -119,9 +120,17 @@ impl WindowManager {
             (xlib.XSetErrorHandler)(Some(wm_error_handler));
 
             loop {
+                use event_handler::*;
 
-                let e: *mut xlib::XEvent = ptr::null_mut();
+                let e: *mut XEvent = ptr::null_mut();
                 (xlib.XNextEvent)(self.display as *mut _, e);
+                info!("Received Event: {:?}", e);
+                match (*e).get_type() {
+                    CreateNotify => {
+                        OnCreateNotify((*e).xcreatewindow);
+                    }
+                    _ => (),
+                }
             }
         }
 
@@ -130,12 +139,10 @@ impl WindowManager {
 
 impl Drop for WindowManager {
     fn drop(&mut self) {
-        let lib = self.xlib;
         info!("Dropping the WM struct");
         unsafe {
-            let ref rlib = *lib;
-            (rlib.XDestroyWindow)(self.display as *mut _, *(self.root_window));
-            (rlib.XCloseDisplay)(self.display as *mut _);
+            (xlib.XDestroyWindow)(self.display as *mut _, *(self.root_window));
+            (xlib.XCloseDisplay)(self.display as *mut _);
         }
 
     }
@@ -143,8 +150,6 @@ impl Drop for WindowManager {
 fn main() {
     let _ = logging::init();
     info!("Starting WM");
-    let xlib: xlib::Xlib;
-    xlib = xlib::Xlib::open().expect("Can't open Xlib");
-    let mut wm = WindowManager::new(&xlib);
+    let mut wm = WindowManager::new();
     wm.run();
 }
