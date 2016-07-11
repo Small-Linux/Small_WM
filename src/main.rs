@@ -1,4 +1,5 @@
-
+// Xlib uses a lot of non upper case constants. This is just to ignore all these warnings
+#![allow(non_upper_case_globals)]
 
 extern crate x11_dl;
 extern crate libc;
@@ -16,20 +17,15 @@ use std::ops::Drop;
 use x11_dl::xlib::*;
 
 lazy_static! {
-    #[allow(non_upper_case_globals)]
 
     static ref xlib: Xlib = Xlib::open().expect("Can't open Xlib");
 }
 
 
 // I know it is bad style, but we need a flag to check if another WM is present
-#[allow(non_upper_case_globals)]
 static mut wm_detected_flag: bool = false;
 
-#[allow(non_upper_case_globals)]
 static c_false: i32 = 0;
-#[allow(non_upper_case_globals)]
-#[allow(dead_code)]
 static c_true: i32 = 1;
 
 pub mod logging;
@@ -114,8 +110,53 @@ impl WindowManager {
                         let event: XDestroyWindowEvent = From::from(*e);
                         event_handler::on_destroy_notify(event);
                     }
+                    ReparentNotify => {
+                        let event: XReparentEvent = From::from(*e);
+                        event_handler::on_reparent_notify(event);
+                    }
+                    MapNotify => {
+                        let event: XMapEvent = From::from(*e);
+                        event_handler::on_map_notify(event);
+                    }
+                    UnmapNotify => {
+                        let event: XUnmapEvent = From::from(*e);
+                        event_handler::on_unmap_notify(event);
+                    }
+                    ConfigureNotify => {
+                        let event: XConfigureEvent = From::from(*e);
+                        event_handler::on_configure_notify(event);
+                    }
+                    MapRequest => {
+                        let event: XMapRequestEvent = From::from(*e);
+                        event_handler::on_map_request(event);
+                    }
+                    ConfigureRequest => {
+                        let event: XConfigureRequestEvent = From::from(*e);
+                        event_handler::on_configure_request_event(event);
+                    }
+                    ButtonPress => {
+                        let event: XButtonEvent = From::from(*e);
+                        event_handler::on_button_press(event);
+                    }
+                    ButtonRelease => {
+                        let event: XButtonEvent = From::from(*e);
+                        event_handler::on_button_release(event);
+                    }
+                    MotionNotify => {
+                        let event: XMotionEvent = From::from(*e);
+                        event_handler::on_motion_notify(event);
+                    }
+                    KeyPress => {
+                        let event: XKeyEvent = From::from(*e);
+                        event_handler::on_key_press(event);
+                    }
+                    KeyRelease => {
+                        let event: XKeyEvent = From::from(*e);
+                        event_handler::on_key_release(event);
+                    }
                     _ => (),
                 }
+
             }
         }
 
