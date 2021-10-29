@@ -2,4 +2,4 @@
 
 xterm 
 #Start our WM
-exec ./target/debug/WindowManager
+exec ./WindowManager
