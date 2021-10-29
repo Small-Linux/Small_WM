@@ -1,8 +1,5 @@
 # Start some Test programms
 
-xterm &
-xclock
-
+xterm 
 #Start our WM
-
 exec ./target/debug/WindowManager
